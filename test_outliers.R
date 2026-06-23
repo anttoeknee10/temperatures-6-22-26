@@ -1,0 +1,127 @@
+# Test script to add outliers with a detailed legend
+# Saved as test_outliers.R
+
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(lubridate)
+
+# 1. Load data
+temp_data <- read_csv("/workspaces/temperatures-6-22-26/boston_temperatures.csv", show_col_types = FALSE)
+
+# 2. Add dummy date in 2020 (a leap year to support Feb 29)
+temp_data <- temp_data %>%
+  mutate(
+    dummy_date = as.Date(paste0("2020-", format(date, "%m-%d")))
+  )
+
+# 3. Create the outliers dataframe
+outliers_df <- data.frame(
+  date = as.Date(c(
+    "2011-07-22", 
+    "2016-02-14", 
+    "1957-01-15", 
+    "2026-06-19", "2026-06-20", "2026-06-21"
+  )),
+  temp_mean_f = c(
+    91.9, 
+    -3.7, 
+    -9.0, 
+    72.8, 72.2, 71.8
+  ),
+  significance = c(
+    "July 22, 2011: Historic Heatwave (Mean 91.9°F, Max 104.5°F) - Tied for 2nd hottest day in Boston history.",
+    "Feb. 14, 2016: Valentine's Day Polar Vortex (Mean -3.7°F, Min -15.5°F) - Coldest day since 1957; wind chills hit -36°F.",
+    "Jan. 15, 1957: All-Time Record Cold (Mean -9.0°F, Min -16.8°F) - The absolute coldest day in this 86-year dataset.",
+    "June 19-21, 2026: Most Recent Days - The last three days of observations in the dataset."
+  )[c(1, 2, 3, 4, 4, 4)]
+)
+
+outliers_df <- outliers_df %>%
+  mutate(
+    dummy_date = as.Date(paste0("2020-", format(date, "%m-%d"))),
+    # Make significance a factor with specified order for the legend
+    significance = factor(significance, levels = c(
+      "July 22, 2011: Historic Heatwave (Mean 91.9°F, Max 104.5°F) - Tied for 2nd hottest day in Boston history.",
+      "Feb. 14, 2016: Valentine's Day Polar Vortex (Mean -3.7°F, Min -15.5°F) - Coldest day since 1957; wind chills hit -36°F.",
+      "Jan. 15, 1957: All-Time Record Cold (Mean -9.0°F, Min -16.8°F) - The absolute coldest day in this 86-year dataset.",
+      "June 19-21, 2026: Most Recent Days - The last three days of observations in the dataset."
+    ))
+  )
+
+# 4. Month labels and breaks
+month_breaks <- as.Date(paste0("2020-", 1:12, "-01"))
+month_labels <- c("Jan.", "Feb.", "March", "April", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec.")
+
+# 5. Build the plot
+p <- ggplot() +
+  # Background scatter plot (dense slate-grey points)
+  geom_point(
+    data = temp_data, 
+    aes(x = dummy_date, y = temp_mean_f),
+    color = "#7f8c8d", 
+    alpha = 0.18, 
+    size = 0.6
+  ) +
+  # Highlighted outlier points mapped to the significance categories
+  geom_point(
+    data = outliers_df,
+    aes(x = dummy_date, y = temp_mean_f, color = significance),
+    size = 3.5
+  ) +
+  # Custom color palette for highlighted events
+  scale_color_manual(
+    values = c(
+      "July 22, 2011: Historic Heatwave (Mean 91.9°F, Max 104.5°F) - Tied for 2nd hottest day in Boston history." = "#E65100", # Deep orange
+      "Feb. 14, 2016: Valentine's Day Polar Vortex (Mean -3.7°F, Min -15.5°F) - Coldest day since 1957; wind chills hit -36°F." = "#29B6F6", # Bright blue
+      "Jan. 15, 1957: All-Time Record Cold (Mean -9.0°F, Min -16.8°F) - The absolute coldest day in this 86-year dataset." = "#0D47A1", # Dark navy
+      "June 19-21, 2026: Most Recent Days - The last three days of observations in the dataset." = "#D81B60" # Terracotta pink/red
+    )
+  ) +
+  # Scales & axes
+  scale_x_date(
+    breaks = month_breaks,
+    labels = month_labels,
+    expand = c(0.01, 0)
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 100, by = 20),
+    expand = c(0, 0)
+  ) +
+  coord_cartesian(ylim = c(-15, 105)) +
+  labs(
+    title = "Daily average temperatures in Boston, 1940-2026",
+    subtitle = "100 deg. Fahrenheit",
+    color = "Highlighted Weather Milestones & Outliers:"
+  ) +
+  # Custom theme
+  theme_minimal() +
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid.major.y = element_line(color = "#e0e0e0", linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    # Title & Subtitle
+    plot.title = element_text(family = "sans", face = "bold", size = 18, color = "black", margin = margin(b = 4)),
+    plot.subtitle = element_text(family = "serif", size = 11, color = "#222222", margin = margin(b = 15)),
+    # Axis
+    axis.title = element_blank(),
+    axis.text.y = element_text(family = "serif", size = 11, color = "#222222"),
+    axis.text.x = element_text(family = "serif", size = 11, color = "#222222", margin = margin(t = 5)),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_line(color = "black", linewidth = 0.5),
+    axis.ticks.length.x = unit(5, "pt"),
+    axis.line.x = element_line(color = "black", linewidth = 0.5),
+    # Legend layout (vertical list at the bottom for long text)
+    legend.position = "bottom",
+    legend.direction = "vertical",
+    legend.box = "vertical",
+    legend.title = element_text(face = "bold", size = 11, family = "sans", margin = margin(b = 5)),
+    legend.text = element_text(size = 9.5, family = "sans"),
+    legend.margin = margin(t = 15)
+  )
+
+# Save
+ggsave("boston_with_legend.png", plot = p, width = 10, height = 9.5, dpi = 300)
+print("Outlier test plot generated!")
